@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <VersionPrefix>0.0.1</VersionPrefix>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,11 @@
   <ItemGroup>
     <None Include="$(OutputPath)/*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Update="tools/*.ps1" CopyToOutputDirectory="Always" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="InjectedCode\*.cs" />
+    <EmbeddedResource Include="InjectedCode\*.cs" />
   </ItemGroup>
 
 </Project>
