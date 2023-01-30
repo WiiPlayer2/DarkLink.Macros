@@ -6,8 +6,8 @@ using System.Text;
 namespace DarkLink.Macros
 {
     [AttributeUsage(AttributeTargets.Field)]
-    internal class Macro : Attribute
+    internal sealed class MacroAttribute : Attribute
     {
-        public Macro(int argumentCount) { }
+        public MacroAttribute(int argumentCount) { }
     }
 }

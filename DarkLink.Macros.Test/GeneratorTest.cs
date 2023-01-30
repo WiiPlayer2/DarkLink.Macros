@@ -1,32 +1,31 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
 namespace DarkLink.Macros.Test;
 
 [TestClass]
-public class GeneratorTest : VerifyBase
+public class GeneratorTest : VerifySourceGenerator
 {
     [TestMethod]
-    public Task Empty()
+    public async Task Empty()
     {
-        // Arrange
+        var source = string.Empty;
 
-        // Act
-        var driver = GenerateDriver();
-
-        // Assert
-        return Verify(driver);
+        await Verify(source);
     }
 
-    private GeneratorDriver GenerateDriver(string? source = null)
+    [TestMethod]
+    public async Task MacroDefinition()
     {
-        var syntaxTree = source is not null
-            ? new[] {CSharpSyntaxTree.ParseText(source),}
-            : Enumerable.Empty<SyntaxTree>();
-        var compilation = CSharpCompilation.Create("Tests", syntaxTree);
-        var generator = new Generator();
+        var source = @"
+using DarkLink.Macros;
 
-        var driver = CSharpGeneratorDriver.Create(generator);
-        return driver.RunGenerators(compilation);
+namespace Tests;
+
+internal static partial class Templates
+{
+    [Macro(1)]
+    private const string TEMPLATE = @""public static string Templated_{0} = """"A templated string: \""""{0}\"""";"""""";
+}
+";
+
+        await Verify(source);
     }
 }

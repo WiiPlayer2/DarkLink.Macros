@@ -1,4 +1,5 @@
-﻿using System;
+﻿//HintName: DarkLink.Macros.InjectedCode.Attributes.cs
+using System;
 using System.Collections.Generic;
 using System.Text;
 
