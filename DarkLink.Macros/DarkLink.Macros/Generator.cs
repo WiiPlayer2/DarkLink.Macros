@@ -1,8 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text;
-using CodeGenHelpers;
-using DarkLink.Macros.Util;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -23,40 +22,43 @@ public class Generator : IIncrementalGenerator
 
         // Initialize
         var macroDefinitions = context.SyntaxProvider.ForAttributeWithMetadataName(
-            ATTRIBUTE_NAME,
-            (node, token) => node is VariableDeclaratorSyntax {Initializer: {Value: LiteralExpressionSyntax literalExpressionSyntax,},} && literalExpressionSyntax.IsKind(SyntaxKind.StringLiteralExpression),
-            (syntaxContext, token) =>
-            {
-                var attribute = syntaxContext.Attributes.Single(a => a.AttributeClass?.ToDisplayString() == ATTRIBUTE_NAME);
-                var argumentCount = (int) attribute.ConstructorArguments[0].Value!;
-                var template = (string) (syntaxContext.TargetSymbol as IFieldSymbol)!.ConstantValue!;
-                var containingType = syntaxContext.TargetSymbol.ContainingType;
-
-                return new MacroDefinition(
-                    argumentCount,
-                    template,
-                    syntaxContext.TargetSymbol.Name,
-                    containingType);
-            });
-
-        context.RegisterSourceOutput(macroDefinitions, (productionContext, definition) =>
-        {
-            var attributeName = $"{definition.Name}Attribute";
-            var hintName = $"{definition.ContainingType.ToDisplayString()}+{attributeName}.cs";
-            var code = CodeBuilder.Create(definition.ContainingType)
-                .AddNestedClass(attributeName)
-                .WithAccessModifier(Accessibility.Private)
-                .SetBaseClass("System.Attribute")
-                .AddAttribute("AttributeUsage(AttributeTargets.Class)")
-                .AddConstructor(Accessibility.Public)
-                .With(cb =>
+                ATTRIBUTE_NAME,
+                (node, token) => node is VariableDeclaratorSyntax {Initializer: {Value: LiteralExpressionSyntax literalExpressionSyntax,},} && literalExpressionSyntax.IsKind(SyntaxKind.StringLiteralExpression),
+                (syntaxContext, token) =>
                 {
-                    for (var i = 0; i < definition.ArgumentCount; i++) cb.AddParameter("object", $"arg{i}");
+                    var attribute = syntaxContext.Attributes.Single(a => a.AttributeClass?.ToDisplayString() == ATTRIBUTE_NAME);
+                    var arguments = attribute.ConstructorArguments[0].Values.Select(v => v.Value).ToArray();
+                    var template = (string) (syntaxContext.TargetSymbol as IFieldSymbol)!.ConstantValue!;
+                    var containingType = syntaxContext.TargetSymbol.ContainingType;
+
+                    return new MacroDefinition(template, containingType, arguments);
                 })
-                .Class
-                .Builder
-                .Build();
-            productionContext.AddSource(hintName, SourceText.From(code, encoding));
+            .Collect()
+            .Select((arr, _) => arr.GroupBy(o => o.ContainingType, SymbolEqualityComparer.Default).ToList());
+
+        context.RegisterSourceOutput(macroDefinitions, (productionContext, groupings) =>
+        {
+            foreach (var grouping in groupings)
+            {
+                var containingType = grouping.Key;
+                var hintName = $"Macros_{containingType!.ToDisplayString()}.cs";
+
+                using var codeBuilder = new StringWriter();
+                codeBuilder.WriteLine($"namespace {containingType.ContainingNamespace.Name} {{");
+                codeBuilder.WriteLine($"partial class {containingType.Name} {{");
+
+                foreach (var definition in grouping)
+                {
+                    var generated = string.Format(definition.Template, definition.Arguments);
+                    codeBuilder.WriteLine(generated);
+                }
+
+                codeBuilder.WriteLine("}");
+                codeBuilder.WriteLine("}");
+                var code = codeBuilder.ToString();
+
+                productionContext.AddSource(hintName, SourceText.From(code, encoding));
+            }
         });
     }
 
@@ -73,5 +75,5 @@ public class Generator : IIncrementalGenerator
         }
     }
 
-    private record MacroDefinition(int ArgumentCount, string Template, string Name, INamedTypeSymbol ContainingType);
+    private record MacroDefinition(string Template, INamedTypeSymbol ContainingType, object?[] Arguments);
 }

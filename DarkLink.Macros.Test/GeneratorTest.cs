@@ -12,7 +12,7 @@ public class GeneratorTest : VerifySourceGenerator
     }
 
     [TestMethod]
-    public async Task MacroDefinition()
+    public async Task MacroUsage()
     {
         var source = @"
 using DarkLink.Macros;
@@ -21,8 +21,8 @@ namespace Tests;
 
 internal static partial class Templates
 {
-    [Macro(1)]
-    private const string TEMPLATE = @""public static string Templated_{0} = """"A templated string: \""""{0}\"""";"""""";
+    [Macro(""test"")]
+    private const string TEMPLATE = @""public static string Templated_{0} = """"A templated string: \""""{0}\"""""""";"";
 }
 ";
 
