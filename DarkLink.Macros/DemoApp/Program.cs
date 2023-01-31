@@ -7,7 +7,7 @@ namespace DemoApp;
 internal static partial class Macros
 {
     [Macro("nope"), Macro("hopla")]
-    private const string Template = @"public static string Templated_{0} = ""A templated string: \""{0}\"";""";
+    private const string Template = @"public static string Templated_{0} = ""A templated string: \""{0}\"""";";
 }
 
 internal class Program

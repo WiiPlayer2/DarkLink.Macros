@@ -69,7 +69,7 @@ public class Generator : IIncrementalGenerator
         foreach (var resource in injectedCodeResources)
         {
             using var stream = assembly.GetManifestResourceStream(resource)!;
-            context.AddSource(resource, SourceText.From(stream, encoding));
+            context.AddSource(resource, SourceText.From(stream, encoding, canBeEmbedded: true));
         }
     }
 
