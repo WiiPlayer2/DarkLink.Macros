@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,43 +23,39 @@ public class Generator : IIncrementalGenerator
 
         // Initialize
         var macroDefinitions = context.SyntaxProvider.ForAttributeWithMetadataName(
-                ATTRIBUTE_NAME,
-                (node, token) => node is VariableDeclaratorSyntax {Initializer: {Value: LiteralExpressionSyntax literalExpressionSyntax,},} && literalExpressionSyntax.IsKind(SyntaxKind.StringLiteralExpression),
-                (syntaxContext, token) =>
-                {
-                    var attribute = syntaxContext.Attributes.Single(a => a.AttributeClass?.ToDisplayString() == ATTRIBUTE_NAME);
-                    var arguments = attribute.ConstructorArguments[0].Values.Select(v => v.Value).ToArray();
-                    var template = (string) (syntaxContext.TargetSymbol as IFieldSymbol)!.ConstantValue!;
-                    var containingType = syntaxContext.TargetSymbol.ContainingType;
-
-                    return new MacroDefinition(template, containingType, arguments);
-                })
-            .Collect()
-            .Select((arr, _) => arr.GroupBy(o => o.ContainingType, SymbolEqualityComparer.Default).ToList());
-
-        context.RegisterSourceOutput(macroDefinitions, (productionContext, groupings) =>
-        {
-            foreach (var grouping in groupings)
+            ATTRIBUTE_NAME,
+            (node, token) => node is VariableDeclaratorSyntax {Initializer: {Value: LiteralExpressionSyntax literalExpressionSyntax}} && literalExpressionSyntax.IsKind(SyntaxKind.StringLiteralExpression),
+            (syntaxContext, token) =>
             {
-                var containingType = grouping.Key;
-                var hintName = $"Macros_{containingType!.ToDisplayString()}.cs";
+                var argumentSets = syntaxContext.Attributes
+                    .Select(a => a.ConstructorArguments[0].Values.Select(v => v.Value).ToArray())
+                    .ToList();
+                var template = (string) (syntaxContext.TargetSymbol as IFieldSymbol)!.ConstantValue!;
+                var containingType = syntaxContext.TargetSymbol.ContainingType;
 
-                using var codeBuilder = new StringWriter();
-                codeBuilder.WriteLine($"namespace {containingType.ContainingNamespace.Name} {{");
-                codeBuilder.WriteLine($"partial class {containingType.Name} {{");
+                return new MacroDefinition(syntaxContext.TargetSymbol.Name, template, containingType, argumentSets);
+            });
 
-                foreach (var definition in grouping)
-                {
-                    var generated = string.Format(definition.Template, definition.Arguments);
-                    codeBuilder.WriteLine(generated);
-                }
+        context.RegisterSourceOutput(macroDefinitions, (productionContext, definition) =>
+        {
+            var containingType = definition.ContainingType;
+            var hintName = $"Macros_{containingType!.ToDisplayString()}+{definition.Name}.cs";
 
-                codeBuilder.WriteLine("}");
-                codeBuilder.WriteLine("}");
-                var code = codeBuilder.ToString();
+            using var codeBuilder = new StringWriter();
+            codeBuilder.WriteLine($"namespace {containingType.ContainingNamespace.Name} {{");
+            codeBuilder.WriteLine($"partial class {containingType.Name} {{");
 
-                productionContext.AddSource(hintName, SourceText.From(code, encoding));
+            foreach (var arguments in definition.ArgumentSets)
+            {
+                var generated = string.Format(definition.Template, arguments);
+                codeBuilder.WriteLine(generated);
             }
+
+            codeBuilder.WriteLine("}");
+            codeBuilder.WriteLine("}");
+            var code = codeBuilder.ToString();
+
+            productionContext.AddSource(hintName, SourceText.From(code, encoding));
         });
     }
 
@@ -75,5 +72,5 @@ public class Generator : IIncrementalGenerator
         }
     }
 
-    private record MacroDefinition(string Template, INamedTypeSymbol ContainingType, object?[] Arguments);
+    private record MacroDefinition(string Name, string Template, INamedTypeSymbol ContainingType, IReadOnlyList<object?[]> ArgumentSets);
 }

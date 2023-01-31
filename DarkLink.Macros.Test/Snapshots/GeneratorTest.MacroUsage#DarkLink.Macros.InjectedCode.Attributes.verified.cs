@@ -5,7 +5,7 @@ using System.Text;
 
 namespace DarkLink.Macros
 {
-    [AttributeUsage(AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
     internal sealed class MacroAttribute : Attribute
     {
         public MacroAttribute(params object[] arguments) { }
